@@ -1,0 +1,48 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>pont cartes</title>
+<script>
+/* ==========================================================
+   PONT DES CARTES POSTALES : à héberger à côté de pont.html (GitHub Pages)
+   Il reçoit les messages du site (postMessage) et parle à Firebase (Realtime Database) en REST.
+   - list : renvoie toutes les cartes
+   - send : crée une carte (les règles Firebase interdisent de modifier une carte existante)
+   - del  : supprime une carte, seulement si le mot de passe du compte admin est bon
+   À REMPLIR : les 3 valeurs ci-dessous (copie DB et API_KEY depuis ton pont.html / ta console Firebase)
+   ========================================================== */
+const DB = "https://TON-PROJET-default-rtdb.europe-west1.firebasedatabase.app";   // sans « / » à la fin
+const API_KEY = "TA_CLE_API_WEB";
+const ADMIN_EMAIL = "toi@exemple.com";   // l'e-mail du compte créé dans Firebase > Authentication
+
+const reply = (e, id, o) => e.source.postMessage(Object.assign({ id: id }, o), e.origin === "null" ? "*" : e.origin);
+async function j(url, opt) {
+	const r = await fetch(url, opt);
+	if (!r.ok) throw new Error("erreur " + r.status);
+	return r.json();
+}
+addEventListener("message", async e => {
+	const m = e.data || {};
+	if (typeof m.id !== "string" || typeof m.type !== "string") return;
+	try {
+		if (m.type === "list") {
+			reply(e, m.id, { items: (await j(DB + "/cartes.json")) || {} });
+		} else if (m.type === "send") {
+			if (typeof m.key !== "string" || !/^[a-z0-9]{6,40}$/.test(m.key)) throw new Error("clé invalide");
+			await j(DB + "/cartes/" + m.key + ".json", { method: "PUT", body: JSON.stringify(m.card || {}) });
+			reply(e, m.id, { ok: true });
+		} else if (m.type === "del") {
+			if (typeof m.key !== "string" || !/^[a-z0-9]{6,40}$/.test(m.key)) throw new Error("clé invalide");
+			let tok;
+			try {
+				tok = (await j("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + API_KEY, {
+					method: "POST", headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ email: ADMIN_EMAIL, password: String(m.pw || ""), returnSecureToken: true })
+				})).idToken;
+			} catch (x) { throw new Error("mot de passe incorrect"); }
+			await j(DB + "/cartes/" + m.key + ".json?auth=" + encodeURIComponent(tok), { method: "DELETE" });
+			reply(e, m.id, { ok: true });
+		}
+	} catch (err) { reply(e, m.id, { error: err.message || "erreur" }); }
+});
+parent.postMessage({ type: "ready-cartes" }, "*");
+</script>
