@@ -30,16 +30,9 @@ addEventListener("message", async e => {
 			if (typeof m.key !== "string" || !/^[a-z0-9]{6,40}$/.test(m.key)) throw new Error("clé invalide");
 			await j(DB + "/cartes/" + m.key + ".json", { method: "PUT", body: JSON.stringify(m.card || {}) });
 			reply(e, m.id, { ok: true });
-		} else if (m.type === "del") {
+				} else if (m.type === "del") {
 			if (typeof m.key !== "string" || !/^[a-z0-9]{6,40}$/.test(m.key)) throw new Error("clé invalide");
-			let tok;
-			try {
-				tok = (await j("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + API_KEY, {
-					method: "POST", headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ email: ADMIN_EMAIL, password: String(m.pw || ""), returnSecureToken: true })
-				})).idToken;
-			} catch (x) { throw new Error("mot de passe incorrect"); }
-			await j(DB + "/cartes/" + m.key + ".json?auth=" + encodeURIComponent(tok), { method: "DELETE" });
+			await j(DB + "/cartes/" + m.key + ".json", { method: "DELETE" });
 			reply(e, m.id, { ok: true });
 		}
 	} catch (err) { reply(e, m.id, { error: err.message || "erreur" }); }
